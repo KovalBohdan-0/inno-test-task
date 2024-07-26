@@ -10,7 +10,6 @@ import java.util.stream.Collectors;
 public class DocumentManager {
 
     private final Map<String, Document> documentStore = new HashMap<>();
-    private long idCounter = 0;
 
     /**
      * Implementation of this method should upsert the document to your storage
@@ -21,7 +20,7 @@ public class DocumentManager {
      */
     public Document save(Document document) {
         if (document.getId() == null || document.getId().isEmpty()) {
-            document.setId(String.valueOf(++idCounter));
+            document.setId(UUID.randomUUID().toString());
         }
         documentStore.put(document.getId(), document);
         return document;
@@ -40,29 +39,35 @@ public class DocumentManager {
     }
 
     private boolean matches(Document document, SearchRequest request) {
-        boolean matches = true;
-
         if (request.getTitlePrefixes() != null && !request.getTitlePrefixes().isEmpty()) {
-            matches &= request.getTitlePrefixes().stream().anyMatch(prefix -> document.getTitle().startsWith(prefix));
+            boolean prefixMatch = request.getTitlePrefixes().stream()
+                    .anyMatch(prefix -> document.getTitle().startsWith(prefix));
+            if (!prefixMatch) return false;
         }
 
         if (request.getContainsContents() != null && !request.getContainsContents().isEmpty()) {
-            matches &= request.getContainsContents().stream().anyMatch(content -> document.getContent().contains(content));
+            boolean contentMatch = request.getContainsContents().stream()
+                    .anyMatch(content -> document.getContent().contains(content));
+            if (!contentMatch) return false;
         }
 
         if (request.getAuthorIds() != null && !request.getAuthorIds().isEmpty()) {
-            matches &= request.getAuthorIds().contains(document.getAuthor().getId());
+            if (!request.getAuthorIds().contains(document.getAuthor().getId())) {
+                return false;
+            }
         }
 
         if (request.getCreatedFrom() != null) {
-            matches &= !document.getCreated().isBefore(request.getCreatedFrom());
+            if (document.getCreated().isBefore(request.getCreatedFrom())) {
+                return false;
+            }
         }
 
         if (request.getCreatedTo() != null) {
-            matches &= !document.getCreated().isAfter(request.getCreatedTo());
+            return !document.getCreated().isAfter(request.getCreatedTo());
         }
 
-        return matches;
+        return true;
     }
 
     /**
